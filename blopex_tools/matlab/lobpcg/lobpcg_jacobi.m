@@ -215,6 +215,9 @@ function [blockVectorX,lambda,varargout] = ...
 %   https://octave.sourceforge.io/linear-algebra/function/lobpcg.html
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %Begin
+% Set-up tolerance of inner eigensolver
+innerTol = 1e-6;
+tol = 1e-10;
 % Function gather defined to be identity if nonexistent, before 2016a
 if exist("gather", "file") == 2
     mygather=@(x)gather(x);
@@ -504,7 +507,18 @@ gramXAX = (gramXAX + gramXAX')*0.5;
 % eig(...,'chol') uses only the diagonal and upper triangle -
 % not true in MATLAB
 % Octave v3.2.3-4, eig() does not support inputting 'chol'
-[coordX,gramXAX]=eig(gramXAX,eye(blockSize));
+%[coordX,gramXAX]=eig(gramXAX,eye(blockSize));
+%[n, ~] = size(gramXAX);
+%A = rand(n, n); A = A+A';
+%[coordX, gramXAX, ~] = jacobi(A, 1, innerTol)
+[n, ~] = size(gramXAX);
+mask = ~eye(n, n);
+if all(abs(gramXAX(mask)) < tol)
+  [coordX, gramXAX] = eig(gramXAX);
+else
+  [coordX, gramXAX, ~] = jacobi(gramXAX, 1, innerTol)
+  gramXAX = full(gramXAX);
+end
 lambda=diag(gramXAX); %eig returns non-ordered eigenvalues on the diagonal
 if issparse(blockVectorX)
     coordX=sparse(coordX);
@@ -862,7 +876,20 @@ for iterationNumber=1:maxIterations
         
     end
     
-    [gramA,gramB]=eig(gramA,gramB);
+    %[gramA,gramB]=eig(gramA,gramB);
+    L = chol(gramB,'lower');
+    temp = L \ gramA;
+    mat = temp / L';
+    [n, ~] = size(mat);
+    mask = ~eye(n, n);
+    if all(abs(mat(mask)) < tol)
+      [gramA, gramB] = eig(mat)
+    else
+      mat
+      all(abs(mat(mask)) < tol)
+      [gramA, gramB, ~] = jacobi(mat, 1, innerTol);
+      gramB = full(gramB);
+    end
     lambda=diag(gramB(1:blockSize,1:blockSize));
     coordX=gramA(:,1:blockSize);
     
@@ -941,7 +968,12 @@ end
 gramXAX = full(blockVectorX'*blockVectorAX);
 gramXAX = (gramXAX + gramXAX')*0.5;
 %Raileigh-Ritz for blockVectorX, which is already operatorB-orthonormal
-[coordX,gramXBX] = eig(gramXAX,gramXBX);
+%[coordX,gramXBX] = eig(gramXAX,gramXBX);
+L = chol(gramXBX,'lower');
+temp = L \ gramXAX;
+mat = temp / L';
+[coordX, gramXBX, hist] = jacobi(mat, 1, innerTol);
+gramXBX = full(gramXBX);
 lambda=diag(gramXBX);
 if issparse(blockVectorX)
     coordX=sparse(coordX);
