@@ -177,7 +177,8 @@ end % while
 % for clearness, remove off-diagonal entries, extract diagonal entries as sparse
 D=spdiags(diag(D),0,n,n);
 % sort eigenvalues in decreasing order by magnitude
-[~,I]=sort(abs(diag(D)),'descend');
+%[~,I]=sort(abs(diag(D)),'descend');
+[~,I]=sort(diag(D));
 % permute eigenvectors and eigenvalues accordingly
 V=V(:,I); D=D(I,I);
 
